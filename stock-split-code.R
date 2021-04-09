@@ -6,7 +6,7 @@
 # Working Directory -------------------------------------------------------
 
 getwd()
-setwd("C:/Users/juzu/Desktop/MBF/Research Seminar Corporate Finance/data")
+# setwd("C:/Users/juzu/Desktop/MBF/Research Seminar Corporate Finance/data")
 
 
 # Packages & Libraries ----------------------------------------------------
@@ -30,7 +30,7 @@ library("RPostgres")
 #entire database
 #@https://wrds-web.wharton.upenn.edu/wrds//ds/crsp/stock_a/
 
-raw_data.ff <- read.table.ffdf(file="C:/Users/juzu/Desktop/MBF/Research Seminar Corporate Finance/data/2010_2020.csv", sep=",")
+raw_data.ff <- read.table.ffdf(file="2010_2020.csv", sep=",")
 
 colnames_wrds <- c("permno","date", "share_code","exchange_code","ticker","company_name","share_class",
                    "primary_exchange","permco","header_exchange_code","declaration_date","payment_date",
@@ -56,7 +56,7 @@ df_2010_2020<- as.data.frame(df_splits_2010_2020)
 #CRSP Database: Daily stock files 01.01.2000 - 31.12.2010 
 #entire database
 
-raw_data.ff2 <- read.table.ffdf(file="C:/Users/juzu/Desktop/MBF/Research Seminar Corporate Finance/data/2000_2010.csv", sep=",")
+raw_data.ff2 <- read.table.ffdf(file="2000_2010.csv", sep=",")
 
 colnames(raw_data.ff2) <- colnames_wrds
 
@@ -88,7 +88,7 @@ unique_identifier <- as.numeric(as.character(unique(split_df_3$permno)))
 
 unique_identifier_2 <- matrix(unique_identifier,ncol = 1)
 
-write.table(unique_identifier_2, file="unique_identifier_2.txt", append = FALSE,row.names = FALSE, col.names = FALSE)
+# write.table(unique_identifier_2, file="unique_identifier_2.txt", append = FALSE,row.names = FALSE, col.names = FALSE)
 
 # Confunding Events -------------------------------------------------------
 #PERMNO's which conducted stocksplits (2000 - 2020) and where the declaration date is available (see unique_identifier)
@@ -106,7 +106,7 @@ unique_cusips <- unique(split_df_4$cusip)
 
 unique_cusips_2 <- matrix(unique_cusips,ncol = 1)
 
-write.table(unique_cusips_2, file="unique_cusips_2.txt", append = FALSE,row.names = FALSE, col.names = FALSE, quote = FALSE)
+# write.table(unique_cusips_2, file="unique_cusips_2.txt", append = FALSE,row.names = FALSE, col.names = FALSE, quote = FALSE)
 
 #WRDS: Capital IQ - Key Developments, 01.01.2000 - 21.11.2020 
 # - used linked- cusips from linking tool to get all the company announcements related to the LPERMNO's which have seen a stock split
@@ -130,7 +130,13 @@ colnames(key_development_lookup)[1] <- "keydeveventtypeid"
 
 merged_df_3<-merge(x = merged_df_2, y = key_development_lookup, by = "keydeveventtypeid", all.x = TRUE)
 
-write.csv2(merged_df_3, file = "C:\\Users\\juzu\\Desktop\\MBF\\Research Seminar Corporate Finance\\data\\split_events_merged.csv",row.names = FALSE)
+# write.csv2(merged_df_3, file = "C:\\Users\\juzu\\Desktop\\MBF\\Research Seminar Corporate Finance\\data\\split_events_merged.csv",row.names = FALSE)
+
+
+# SHORTCUT ----------------------------------------------------------------
+
+merged_df_3<-read.csv2("split_events_merged.csv")
+#----------------------------------------------------------------
 
 non_confounding_df<- merged_df_3[is.na(merged_df_3$keydevid),]
 
@@ -138,6 +144,8 @@ non_confounding_df<- merged_df_3[is.na(merged_df_3$keydevid),]
 #@https://wrds-web.wharton.upenn.edu/wrds//ds/crsp/indexes_a/mktindex/cap_d.cfm
 
 market_return_df <- read.csv("market_returns.csv")
+
+
 
 # Daily stock returns
 
@@ -229,4 +237,4 @@ results_df <- as.data.frame(return_df)
 
 head(results_df)
 
-write.csv2(results_df, file = "C:\\Users\\juzu\\Desktop\\MBF\\Research Seminar Corporate Finance\\data\\results_df.csv",row.names = FALSE)
+write.csv2(results_df, file = "results_df.csv",row.names = FALSE)
