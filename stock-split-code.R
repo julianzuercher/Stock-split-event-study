@@ -13,7 +13,7 @@ getwd()
 
 #install.packages("ff")
 #install.packages("ffbase")
-# install.packages("RPostgres")
+#install.packages("RPostgres")
 
 library("ff")
 library("ffbase")
@@ -24,7 +24,7 @@ library("writexl")
 library("tidyverse")
 library("RPostgres")
 
-# Data Gathering ----------------------------------------------------------
+# Data gathering for stock split equity titles  ----------------------------------------------------------
 
 #CRSP Database: Daily stock files, 01.01.2010 - 31.12.2020 
 #entire database
@@ -70,7 +70,7 @@ df_splits_2000_2010 <- raw_data.ff2[raw_data.ff2$distribution_code==5523,]
 df_2000_2010<- as.data.frame(df_splits_2000_2010)
 
 # length(unique(df_2000_2010$company_name))
-#2389 companies that conducted a stock split from 2010-2020 (data from)
+#2389 companies that conducted a stock split from 2010-2020 
 
 split_df <- rbind(df_2000_2010,df_2010_2020)
 #write.csv2(split_df,"stocksplit_df.csv",row.names=FALSE)
@@ -82,7 +82,7 @@ split_df_2 <- split_df[(!is.na(split_df$declaration_date)) & (split_df$declarati
 #only splits where the delcaration date was recorded
 
 split_df_3 <- split_df_2[split_df_2$share_code==11,]
-#only common shares
+#only common shares - as in empirical literature
 
 unique_identifier <- as.numeric(as.character(unique(split_df_3$permno)))
 
@@ -91,6 +91,8 @@ unique_identifier_2 <- matrix(unique_identifier,ncol = 1)
 # write.table(unique_identifier_2, file="unique_identifier_2.txt", append = FALSE,row.names = FALSE, col.names = FALSE)
 
 # Confunding Events -------------------------------------------------------
+
+# -> elimminating effects that could effect stock returns on announcement date
 #PERMNO's which conducted stocksplits (2000 - 2020) and where the declaration date is available (see unique_identifier)
 
 #Linked with CRSP/Compustat Merged Database (under CRSP) - Linking Table (to  GVKEY)
@@ -132,22 +134,32 @@ merged_df_3<-merge(x = merged_df_2, y = key_development_lookup, by = "keydeveven
 
 # write.csv2(merged_df_3, file = "C:\\Users\\juzu\\Desktop\\MBF\\Research Seminar Corporate Finance\\data\\split_events_merged.csv",row.names = FALSE)
 
+non_confounding_df<- merged_df_3[is.na(merged_df_3$keydevid),]
+#removing all cofounding events / selecting only splits with no confounding events
 
 # SHORTCUT ----------------------------------------------------------------
-
+#--------------------------------------------------------------------------
 merged_df_3<-read.csv2("split_events_merged.csv")
-#----------------------------------------------------------------
 
-non_confounding_df<- merged_df_3[is.na(merged_df_3$keydevid),]
+results_df<-read.csv2("results_df.csv")
+#--------------------------------------------------------------------------
+#--------------------------------------------------------------------------
 
-#Market return during 2000-2020
+
+# Return data for split titles --------------------------------------------
+
+#Market return during 2000-2020 (NYSE,AMEX,NASDAQ - value weighted)
 #@https://wrds-web.wharton.upenn.edu/wrds//ds/crsp/indexes_a/mktindex/cap_d.cfm
 
 market_return_df <- read.csv("market_returns.csv")
 
 
+# Daily stock returns: direct SQL querry from WRDS 
+# -> requires an account and storage of account name / PW on local file, see below:
+# @https://wrds-www.wharton.upenn.edu/pages/support/programming-wrds/programming-r/r-from-your-computer/
+# for the querry structure, see below
+# @https://wrds-www.wharton.upenn.edu/pages/support/programming-wrds/programming-r/querying-wrds-data-r/#introduction
 
-# Daily stock returns
 
 wrds <- dbConnect(Postgres(),
                   host='wrds-pgdata.wharton.upenn.edu',
@@ -237,4 +249,4 @@ results_df <- as.data.frame(return_df)
 
 head(results_df)
 
-write.csv2(results_df, file = "results_df.csv",row.names = FALSE)
+# write.csv2(results_df, file = "results_df.csv",row.names = FALSE)
