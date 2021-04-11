@@ -198,25 +198,24 @@ colnames(confounding_df)[3]<-"id_5_pre"
 merged_df_11<-left_join(x = merged_df_10, y = confounding_df[,c(3,4,6)], by = c("declaration_date_5_pre","GVKEY"))
 merged_df_11<-unique(merged_df_11)
 
-a<-merged_df_11[all(is.na(merged_df_11[,32:42])),]
+key_development_lookup <- read.csv2("key_development_lookup.csv")
+colnames(key_development_lookup)[1] <- "keydeveventtypeid"
 
-indx <- apply(merged_df_11[,32:42], 1, function(x) all(is.na(x)))
-confounding_10days <- merged_df_11[indx,]
+#after looking up all different events provided by Capital IQ, all confounding events in a 10-day window around the stock split
+#announcement were listed. Stock splits with such an event were removed from the data set
+
+merged_df_11_<-merge(x = merged_df_11, y = key_development_lookup, by = "keydeveventtypeid", all.x = TRUE)
+
+indx <- apply(merged_df_11_[,32:42], 1, function(x) all(is.na(x)))
+
+confounding_10days <- merged_df_11_[indx,]
 
 #write.csv2(confounding_10days,"confounding_10days.csv",row.names=FALSE)
 
 
 
-key_development_lookup <- read.csv2("key_development_lookup.csv")
+# Further filter Criteria ---------------------------------------------------------
 
-colnames(key_development_lookup)[1] <- "keydeveventtypeid"
-
-merged_df_3<-merge(x = merged_df_2, y = key_development_lookup, by = "keydeveventtypeid", all.x = TRUE)
-
-# write.csv2(merged_df_3, file = "C:\\Users\\juzu\\Desktop\\MBF\\Research Seminar Corporate Finance\\data\\split_events_merged.csv",row.names = FALSE)
-
-non_confounding_df<- merged_df_3[is.na(merged_df_3$keydevid),]
-#removing all cofounding events / selecting only splits with no confounding events
 
 non_confounding_df$market_cap <- as.numeric(non_confounding_df$shares_oustanding_in_ks)*1000*as.numeric(non_confounding_df$share_price)
 
