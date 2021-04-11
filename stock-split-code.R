@@ -49,6 +49,8 @@ table.ff(df_splits_2010_2020$distribution_code)
 
 df_2010_2020<- as.data.frame(df_splits_2010_2020)
 
+table(df_2010_2020$factor_to_adjust_price_FACPR)
+
 #length(unique(df_2010_2020$company_name))
 #1512 unique companies that conducted a stock split from 2010-2020
 
@@ -150,7 +152,9 @@ colnames(confounding_df)[4]<-"declaration_date"
 
 colnames(confounding_df)[6]<-"GVKEY"
 
-# split_df_4$declaration_date<-as.numeric(as.character(split_df_4$declaration_date))
+confounding_df=confounding_df[!confounding_df$keydeveventtypeid %in% c(53,55,78,140,144),]
+#removing only superficial confounding events from the black list (announcement of certain dates, internal meeting dates etc.) that will bear
+#no information to the pulic
 
 merged_df_1<-left_join(x = split_df_4, y = confounding_df[,c(3,4,6)], by = c("declaration_date","GVKEY"))
 merged_df_1<-unique(merged_df_1)
@@ -210,26 +214,26 @@ indx <- apply(merged_df_11_[,32:42], 1, function(x) all(is.na(x)))
 
 confounding_10days <- merged_df_11_[indx,]
 
-#write.csv2(confounding_10days,"confounding_10days.csv",row.names=FALSE)
+confounding_10days_small <- confounding_10days[,c(1:19)]
 
+#write.csv2(confounding_10days,"confounding_10days.csv",row.names=FALSE)
 
 
 # Further filter Criteria ---------------------------------------------------------
 
+confounding_10days_small$market_cap <- as.numeric(confounding_10days$shares_oustanding_in_ks)*1000*as.numeric(confounding_10days$share_price)
 
-non_confounding_df$market_cap <- as.numeric(non_confounding_df$shares_oustanding_in_ks)*1000*as.numeric(non_confounding_df$share_price)
+non_conf_large <- confounding_10days_small[confounding_10days_small$market_cap>= 0,]
 
-non_conf_large <- non_confounding_df[non_confounding_df$market_cap>= 1000000,]
+non_conf_df <- non_conf_large[as.numeric(non_conf_large$factor_to_adjust_price_FACPR)>0.25,]
 
+non_conf_df$year <- as.numeric(substr(non_conf_df$declaration_date, 1, 4))
 
-# SHORTCUT ----------------------------------------------------------------
-#--------------------------------------------------------------------------
-merged_df_3<-read.csv2("split_events_merged.csv")
+non_conf_df_09_19 <- non_conf_df[(non_conf_df$year>=2009) & (non_conf_df$year<=2019),]
 
-results_df<-read.csv2("results_df.csv")
-#--------------------------------------------------------------------------
-#--------------------------------------------------------------------------
+final_df<-unique(non_conf_df_09_19)
 
+# write.csv2(final_df,"final_df.csv",row.names=FALSE)
 
 # Return data for split titles --------------------------------------------
 
