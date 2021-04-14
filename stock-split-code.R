@@ -68,7 +68,7 @@ df_2000_2010<- as.data.frame(df_splits_2000_2010)
 #2389 unique companies that conducted a stock split from 2010-2020 
 
 split_df <- rbind(df_2000_2010,df_2010_2020)
-# write.csv2(split_df,"stocksplit_df_raw.csv",row.names=FALSE)
+#write.csv(split_df,"stocksplit_df_raw.csv",row.names=FALSE)
 
 rm(raw_data.ff)
 rm(raw_data.ff2)
@@ -140,6 +140,8 @@ confounding_df <- read.csv("confounding.csv")
 colnames(confounding_df)[4]<-"declaration_date"
 colnames(confounding_df)[6]<-"GVKEY"
 
+confounding_table<-as.data.frame(table(confounding_df$keydeveventtypeid))
+
 key_development_lookup <- read.csv2("key_development_lookup.csv")
 colnames(key_development_lookup)[1] <- "keydeveventtypeid"
 #MANUAL CHECK: WHICH EVENTS SHOULD BE EXCLUDED
@@ -202,7 +204,7 @@ indx <- apply(merged_df_11[,32:42], 1, function(x) all(is.na(x)))
 confounding_10days <- merged_df_11[indx,]
 confounding_10days_small <- confounding_10days[,c(1:19)]
 
-#write.csv2(confounding_10days,"confounding_10days.csv",row.names=FALSE)
+#write.csv(confounding_10days,"confounding_10days.csv",row.names=FALSE)
 
 
 # Further filter criteria --------------------------------------------------------------------------------
@@ -211,7 +213,7 @@ confounding_10days_small <- confounding_10days[,c(1:19)]
 confounding_10days_small$market_cap <- 
   as.numeric(as.character(confounding_10days_small$shares_oustanding_in_ks))*1000*as.numeric(as.character(confounding_10days_small$share_price))
 
-non_conf_large <- confounding_10days_small[confounding_10days_small$market_cap> 0,]
+non_conf_large <- confounding_10days_small[confounding_10days_small$market_cap> 0,]
 non_conf_df <- non_conf_large[as.numeric(as.character(non_conf_large$factor_to_adjust_price_FACPR))>0.25,]
 non_conf_df$year <- as.numeric(substr(non_conf_df$declaration_date, 1, 4))
 non_conf_df_10_19 <- non_conf_df[(non_conf_df$year>=2010) & (non_conf_df$year<=2019),]
@@ -228,7 +230,7 @@ final_df_3 <- final_df_2[order(final_df_2$trading_volume, decreasing = TRUE),]
 final_df_4 <- final_df_3[!duplicated(final_df_3$permco) | !duplicated(final_df_3$declaration_date),]
 #delete duplicated values with lowest trading volume
 
-write.csv2(final_df_4,"final_df_10_19_ff.csv",row.names=FALSE)
+#write.csv(final_df_4,"final_df_10_19_ff.csv",row.names=FALSE)
 
 
 # Return / Market data for split titles ---------------------------------------------------------------------------
@@ -437,6 +439,114 @@ for (i in 1:nrow(final_df_4)){
 }
 
 car_df <- eventwindow_df - market_model_df
+car_df_3 <- car_df[3:9,]
+car_df_1 <- car_df_3[3:5,]
+# write.csv(car_df,"car_df.csv",row.names=TRUE)
 
-write.csv2(car_df,"car_df.csv",row.names=TRUE)
 
+# Regressions --------------------------------------------------------------------------------------------
+
+
+CAR_table_out<-as.data.frame(matrix(NA,ncol = 9, nrow = 11))
+
+colnames(CAR_table_out) <- c("Days","Average Abnormal Returns","Percentage of which positive","T-statistic","p-value","Cummulative Average Abnormal Returns",
+                             "Percentage of which positive","T-statistic","p-value")
+
+CAR_table_out[,1] <- -5:5
+CAR_table_out[,2] <- apply(car_df, 1, mean)
+CAR_table_out[,3] <- apply(car_df, 1, function(i) (sum(i>0)/ncol(car_df)))
+
+results_t_test <- rep(NA,11)
+results_p_values <- rep(NA,11)
+
+for (i in 1:nrow(CAR_table_out)){
+  tests<-t.test(car_df[i,])
+  results_t_test[i] <- tests$statistic
+  results_p_values[i] <- tests$p.value
+}
+
+CAR_table_out[,4] <- results_t_test
+CAR_table_out[,5] <- results_p_values
+
+cars_temporary_buffer<-as.data.frame(matrix(NA,ncol = 64, nrow = 11))
+caars <- as.data.frame(matrix(NA,ncol = 1, nrow = 11))
+
+for (i in 1:nrow(CAR_table_out)){
+  small<-car_df[1:i,]
+  cars_temporary_buffer[i,]<-apply(small, 2, sum)
+  caars[i,]<-apply(cars_temporary_buffer[i,], 1, mean)
+}
+
+CAR_table_out[,6] <- caars
+CAR_table_out[,7] <- apply(cars_temporary_buffer, 1, function(i) (sum(i>0)/ncol(cars_temporary_buffer)))
+
+results_t_test_cum <- rep(NA,11)
+results_p_values_cum <- rep(NA,11)
+
+for (i in 1:nrow(cars_temporary_buffer)){
+  tests_cum<-t.test(cars_temporary_buffer[i,])
+  results_t_test_cum[i] <- tests_cum$statistic
+  results_p_values_cum[i] <- tests_cum$p.value
+}
+
+CAR_table_out[,8] <- results_t_test_cum
+CAR_table_out[,9] <- results_p_values_cum
+
+# ----------------------------------------------------------------
+
+colnames(car_df)
+
+card_df_wo_insy_2 <- car_df[,-c(24,64,63,62,60)]
+
+
+CAR_table_out3<-as.data.frame(matrix(NA,ncol = 9, nrow = 11))
+
+colnames(CAR_table_out3) <- c("Days","Average Abnormal Returns","Percentage of which positive","T-statistic","p-value","Cummulative Average Abnormal Returns",
+                             "Percentage of which positive","T-statistic","p-value")
+
+CAR_table_out3[,1] <- -5:5
+CAR_table_out3[,2] <- apply(card_df_wo_insy_2, 1, mean)
+CAR_table_out3[,3] <- apply(card_df_wo_insy_2, 1, function(i) (sum(i>0)/ncol(card_df_wo_insy_2)))
+
+results_t_test <- rep(NA,11)
+results_p_values <- rep(NA,11)
+
+for (i in 1:nrow(CAR_table_out3)){
+  tests<-t.test(card_df_wo_insy_2[i,])
+  results_t_test[i] <- tests$statistic
+  results_p_values[i] <- tests$p.value
+}
+
+CAR_table_out3[,4] <- results_t_test
+CAR_table_out3[,5] <- results_p_values
+
+cars_temporary_buffer<-as.data.frame(matrix(NA,ncol = 59, nrow = 11))
+caars <- as.data.frame(matrix(NA,ncol = 1, nrow = 11))
+
+for (i in 1:nrow(CAR_table_out3)){
+  small<-card_df_wo_insy_2[1:i,]
+  cars_temporary_buffer[i,]<-apply(small, 2, sum)
+  caars[i,]<-apply(cars_temporary_buffer[i,], 1, mean)
+}
+
+CAR_table_out3[,6] <- caars
+CAR_table_out3[,7] <- apply(cars_temporary_buffer, 1, function(i) (sum(i>0)/ncol(cars_temporary_buffer)))
+
+results_t_test_cum <- rep(NA,11)
+results_p_values_cum <- rep(NA,11)
+
+for (i in 1:nrow(cars_temporary_buffer)){
+  tests_cum<-t.test(cars_temporary_buffer[i,])
+  results_t_test_cum[i] <- tests_cum$statistic
+  results_p_values_cum[i] <- tests_cum$p.value
+}
+
+CAR_table_out3[,8] <- results_t_test_cum
+CAR_table_out3[,9] <- results_p_values_cum
+
+
+#write.csv(CAR_table_out3,"car_table_out3.csv",row.names=FALSE)
+
+#1on1 test walktrough
+
+#univariate - regressions - at least significant 10% level
