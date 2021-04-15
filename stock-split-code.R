@@ -85,14 +85,12 @@ split_df_2 <- split_df[(!is.na(split_df$declaration_date)) & (split_df$declarati
 #only splits where the delcaration date was recorded
 
 split_df_2$year <- as.numeric(substr(split_df_2$declaration_date, 1, 4))
-
 split_df_3 <- split_df_2[(split_df_2$year>=2010) & (split_df_2$year<=2019),]
-
 split_df_4 <- split_df_3[split_df_3$share_code==11,]
 #only common shares - as in empirical literature
 
 unique_permnos<-unique(split_df_4$permno)
-
+#using the permnos to construct the lookup table / linking table to later match the stock splits to the confounding events
 #write.table(unique_permnos,"permnos.txt",row.names = FALSE, col.names = FALSE, quote = FALSE)
 
 # Expanding event window around declaration date to clear for all confounding events in 10 day period around split announcement:
@@ -142,19 +140,8 @@ linking_table_small<-linking_table[,c("GVKEY","ticker","permno")]
 linking_table_small_u<-unique(linking_table_small<-linking_table[,c("GVKEY","ticker","permno")])
 
 split_df_5<-merge(x = split_df_4, y = linking_table_small_u, by = c("permno","ticker"), all.x = TRUE)
-
 split_df_6 <- na.omit(split_df_5)
-
-# unique_identifier <- as.numeric(as.character(unique(split_df_3$permno)))
-# unique_identifier_2 <- matrix(unique_identifier,ncol = 1)
-# write.table(unique_identifier_2, file="unique_identifier_2.txt", append = FALSE,row.names = FALSE, col.names = FALSE)
-
-# colnames(linking_table)[3]<-"permno"
-# split_df_4<-merge(x = split_df_3, y = linking_table[,c("permno","GVKEY","cusip")], by = "permno", all.x = TRUE)
-
-# unique_cusips <- unique(split_df_4$cusip)
-# unique_cusips_2 <- matrix(unique_cusips,ncol = 1)
-# write.table(unique_cusips_2, file="unique_cusips_2.txt", append = FALSE,row.names = FALSE, col.names = FALSE, quote = FALSE)
+#get the lookup table
 
 #WRDS: Capital IQ - Key Developments, 01.01.2000 - 21.11.2020 
 # - used linked- cusips from linking tool to get all the company announcements related to the LPERMNO's which have seen a stock split
@@ -164,12 +151,9 @@ confounding_df <- read.csv("confounding_GVKEY.csv")
 colnames(confounding_df)[4]<-"declaration_date"
 colnames(confounding_df)[6]<-"GVKEY"
 
-
-# confounding_table<-as.data.frame(table(confounding_df$keydeveventtypeid))
-# 
 # key_development_lookup <- read.csv2("key_development_lookup.csv")
 # colnames(key_development_lookup)[1] <- "keydeveventtypeid"
-#MANUAL CHECK: WHICH EVENTS SHOULD BE EXCLUDED
+# MANUAL CHECK: WHICH EVENTS SHOULD BE EXCLUDED
 
 confounding_df=confounding_df[!confounding_df$keydeveventtypeid %in% c(53,55,78,140,144),]
 #removing only superficial confounding events from the black list (announcement of certain dates, internal meeting dates etc.) that will bear
@@ -292,12 +276,12 @@ market_return_df$date <- as.Date(format(market_return_df$date , format = '%Y%m%d
 # @https://wrds-www.wharton.upenn.edu/pages/support/programming-wrds/programming-r/querying-wrds-data-r/#introduction
 
 
-# wrds <- dbConnect(Postgres(),
-#                   host='wrds-pgdata.wharton.upenn.edu',
-#                   port=9737,
-#                   dbname='wrds',
-#                   sslmode='require',
-#                   user='dajulian')
+wrds <- dbConnect(Postgres(),
+                  host='wrds-pgdata.wharton.upenn.edu',
+                  port=9737,
+                  dbname='wrds',
+                  sslmode='require',
+                  user='dajulian')
 
 # Finding the trading days for the entire cross-section of 
 # stocks listed on the New York Stock Exchange (NYSE), t
@@ -547,124 +531,4 @@ CAR_table_out[,7] <- apply(cars_temporary_buffer, 1, function(i) (sum(i>0)/ncol(
 results_t_test_cum <- rep(NA,11)
 results_p_values_cum <- rep(NA,11)
 
-for (i in 1:nrow(cars_temporary_buffer)){
-  tests_cum<-t.test(cars_temporary_buffer[i,])
-  results_t_test_cum[i] <- tests_cum$statistic
-  results_p_values_cum[i] <- tests_cum$p.value
-}
 
-CAR_table_out[,8] <- results_t_test_cum
-CAR_table_out[,9] <- results_p_values_cum
-
-# ----------------------------------------------------------------
-# 
-colnames(car_df)
-
-# card_df_wo_insy_2 <- car_df[,-c(24,64,63,62,60)]
-# 
-# 
-# CAR_table_out3<-as.data.frame(matrix(NA,ncol = 9, nrow = 11))
-# 
-# colnames(CAR_table_out3) <- c("Days","Average Abnormal Returns","Percentage of which positive","T-statistic","p-value","Cummulative Average Abnormal Returns",
-#                              "Percentage of which positive","T-statistic","p-value")
-# 
-# CAR_table_out3[,1] <- -5:5
-# CAR_table_out3[,2] <- apply(card_df_wo_insy_2, 1, mean)
-# CAR_table_out3[,3] <- apply(card_df_wo_insy_2, 1, function(i) (sum(i>0)/ncol(card_df_wo_insy_2)))
-# 
-# results_t_test <- rep(NA,11)
-# results_p_values <- rep(NA,11)
-# 
-# for (i in 1:nrow(CAR_table_out3)){
-#   tests<-t.test(card_df_wo_insy_2[i,])
-#   results_t_test[i] <- tests$statistic
-#   results_p_values[i] <- tests$p.value
-# }
-# 
-# CAR_table_out3[,4] <- results_t_test
-# CAR_table_out3[,5] <- results_p_values
-# 
-# cars_temporary_buffer<-as.data.frame(matrix(NA,ncol = 59, nrow = 11))
-# caars <- as.data.frame(matrix(NA,ncol = 1, nrow = 11))
-# 
-# for (i in 1:nrow(CAR_table_out3)){
-#   small<-card_df_wo_insy_2[1:i,]
-#   cars_temporary_buffer[i,]<-apply(small, 2, sum)
-#   caars[i,]<-apply(cars_temporary_buffer[i,], 1, mean)
-# }
-# 
-# CAR_table_out3[,6] <- caars
-# CAR_table_out3[,7] <- apply(cars_temporary_buffer, 1, function(i) (sum(i>0)/ncol(cars_temporary_buffer)))
-# 
-# results_t_test_cum <- rep(NA,11)
-# results_p_values_cum <- rep(NA,11)
-# 
-# for (i in 1:nrow(cars_temporary_buffer)){
-#   tests_cum<-t.test(cars_temporary_buffer[i,])
-#   results_t_test_cum[i] <- tests_cum$statistic
-#   results_p_values_cum[i] <- tests_cum$p.value
-# }
-# 
-# CAR_table_out3[,8] <- results_t_test_cum
-# CAR_table_out3[,9] <- results_p_values_cum
-
-
-#write.csv(CAR_table_out3,"car_table_out3.csv",row.names=FALSE)
-
-#1on1 test walktrough
-
-#univariate - regressions - at least significant 10% level
-
-
-
-# get_stock_prices <- function(data.frame) {
-#   data_1<- tryCatch(
-#     {
-#       
-#       a<- as.character(data.frame$permno[1])
-#       b<- as.character(data.frame$est_start_date[1])
-#       c<- as.character(data.frame$end_date[1])
-#       d<-sprintf("select permno,date,prc
-#                  from crsp.dsf
-#                  where permno = '%s'
-#                  and date between '%s'
-#                  and '%s'", a,b,c)
-#       
-#       res <- dbSendQuery(wrds, d)
-#       data <- dbFetch(res, n=-1)
-#       dbClearResult(res)
-#       data$date <- format(data$date, format = '%d.%m.%Y')
-#       out<-merge(data,final_df_4[,c(1,6)],all.x = TRUE)
-#       
-#      
-#       return(out)
-#       
-#     },
-#     error = function(e){
-#       message('Error in the process')
-#       print(e)
-#       dbClearResult(res)
-#     }
-#     
-#     
-#       )
-# }
-# 
-# prices_df_EST <- matrix(data=NA, nrow= 1, ncol= 4)
-# colnames(prices_df_EST)<-c("permno","date","prc","company_name")
-# 
-# for (i in 1:nrow(final_df_4)){
-#   sub_df <- final_df_4[i,]
-#   a <- get_stock_prices(sub_df)
-#   prices_df_EST <- rbind(prices_df_EST,a)
-# }
-
-
-colnames(prices_df_EST)
-
-write.csv(prices_df_EST_3,"02_FirmData_final_amk.csv")
-
-#t-test -> variance -> of estimation window 
-
-#cumulative 
-#2nd approach: cumulative abnormal returns
