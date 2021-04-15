@@ -241,6 +241,7 @@ final_df_4 <- final_df_3[!duplicated(final_df_3$permco) | !duplicated(final_df_3
 
 #Market return during 2000-2020 (NYSE,AMEX,NASDAQ - value weighted)
 #@https://wrds-web.wharton.upenn.edu/wrds//ds/crsp/indexes_a/mktindex/cap_d.cfm
+#market index -> justify it
 
 market_return_df <- read.csv("market_returns.csv")
 colnames(market_return_df)[1]<-"date"
@@ -399,12 +400,11 @@ get_stock_beta_from_estimation <- function(data.frame) {
       res <- dbSendQuery(wrds, d)
       data <- dbFetch(res, n=-1)
       dbClearResult(res)
-      data_with_gap <- head(data,-10)
+      data_with_gap <- head(data,-16)
       data_with_gap_120 <- tail(data_with_gap,120)
       rets<-merge(data_with_gap_120,market_return_df,by="date",all.x="true")
-      regression<-lm(rets$vwretd ~ rets$ret)
+      regression<-lm(rets$ret ~ rets$vwretd)
       return(regression$coefficients)
-      
     },
     error = function(e){
       message('Error in the process')
@@ -415,6 +415,7 @@ get_stock_beta_from_estimation <- function(data.frame) {
     
       )
 }
+
 
 alphas_betas_df <- matrix(data=NA, nrow= 2, ncol= nrow(final_df_4))
 
@@ -440,7 +441,7 @@ for (i in 1:nrow(final_df_4)){
 
 car_df <- eventwindow_df - market_model_df
 car_df_3 <- car_df[3:9,]
-car_df_1 <- car_df_3[3:5,]
+car_df_1 <- car_df_3[5:7,]
 # write.csv(car_df,"car_df.csv",row.names=TRUE)
 
 
@@ -449,8 +450,8 @@ car_df_1 <- car_df_3[3:5,]
 
 CAR_table_out<-as.data.frame(matrix(NA,ncol = 9, nrow = 11))
 
-colnames(CAR_table_out) <- c("Days","Average Abnormal Returns","Percentage of which positive","T-statistic","p-value","Cummulative Average Abnormal Returns",
-                             "Percentage of which positive","T-statistic","p-value")
+colnames(CAR_table_out) <- c("Days","Average Abnormal Returns","Percentage of which positive","T-statistic","p-value",
+                             "Cummulative Average Abnormal Returns","Percentage of which positive","T-statistic","p-value")
 
 CAR_table_out[,1] <- -5:5
 CAR_table_out[,2] <- apply(car_df, 1, mean)
@@ -494,8 +495,8 @@ CAR_table_out[,9] <- results_p_values_cum
 
 # ----------------------------------------------------------------
 # 
-# colnames(car_df)
-# 
+colnames(car_df)
+
 # card_df_wo_insy_2 <- car_df[,-c(24,64,63,62,60)]
 # 
 # 
@@ -543,7 +544,7 @@ CAR_table_out[,9] <- results_p_values_cum
 # 
 # CAR_table_out3[,8] <- results_t_test_cum
 # CAR_table_out3[,9] <- results_p_values_cum
-# 
+
 
 #write.csv(CAR_table_out3,"car_table_out3.csv",row.names=FALSE)
 
