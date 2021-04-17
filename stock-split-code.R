@@ -35,63 +35,45 @@ colnames_wrds <- c("permno","date", "share_code","exchange_code","ticker","compa
                    "distribution_code","factor_to_adjust_price_FACPR","factor_to_adjust_shares_FACSHR",
                    "share_price","trading_volume","shares_oustanding_in_ks", "number_of_trades")
 
-
 df_splits_2010_2020=raw_data.ff[raw_data.ff$distribution_code==5523,]
 
 #table.ff(df_splits_2010_2020$distribution_code)
-#5523= stock split without dividend:
+#5523 = (reverse) stock split without dividend:
 #CRSP guide:
 #p 15: reverse splits 
 #p. 130: split
 
 df_2010_2020<- as.data.frame(df_splits_2010_2020)
 
-#length(unique(df_2010_2020$company_name))
-#1512 unique companies that conducted a stock split from 2010-2020
+#due to size of data sets: load in files for 2010 - 2020 and for 2000 - 2010  seperateky
 
-#CRSP Database: Daily stock files 01.01.2000 - 31.12.2010 
-#entire database
+raw_data.ff2 <- read.table.ffdf(file="2000_2010.csv", sep=",")
+colnames(raw_data.ff2) <- colnames_wrds
+df_splits_2000_2010 <- raw_data.ff2[raw_data.ff2$distribution_code==5523,]
+df_2000_2010<- as.data.frame(df_splits_2000_2010)
 
-# raw_data.ff2 <- read.table.ffdf(file="2000_2010.csv", sep=",")
-# 
-# colnames(raw_data.ff2) <- colnames_wrds
-# 
-# df_splits_2000_2010 <- raw_data.ff2[raw_data.ff2$distribution_code==5523,]
-
-#5523= stock split without dividend:
-#CRSP guide:
-#p 15: reverse splits 
-#p. 130: split
-
-# df_2000_2010<- as.data.frame(df_splits_2000_2010)
-
-#length(unique(df_2000_2010$company_name))
-#2389 unique companies that conducted a stock split from 2010-2020 
-
-# split_df <- rbind(df_2000_2010,df_2010_2020)
-
-
-
+split_df <- rbind(df_2000_2010,df_2010_2020)
 #write.csv(split_df,"stocksplit_df_raw.csv",row.names=FALSE)
 
 split_df<-read.csv2("stocksplit_df_raw.csv")
 
 rm(raw_data.ff)
-# rm(raw_data.ff2)
-
-
+rm(raw_data.ff2)
 
 split_df_2 <- split_df[(!is.na(split_df$declaration_date)) & (split_df$declaration_date != ""),]
-#only splits where the delcaration date was recorded
+#only splits where the delcaration date / "announcement date" was recorded
 
 split_df_2$year <- as.numeric(substr(split_df_2$declaration_date, 1, 4))
 split_df_3 <- split_df_2[(split_df_2$year>=2010) & (split_df_2$year<=2019),]
+#focus on 2010 - 2019 to avoid distortions due to the GFC and COVID 19
 split_df_4 <- split_df_3[split_df_3$share_code==11,]
 #only common shares - as in empirical literature
 
-unique_permnos<-unique(split_df_4$permno)
-#using the permnos to construct the lookup table / linking table to later match the stock splits to the confounding events
+
+
+length(unique_permnos<-unique(split_df_2$permno))
 #write.table(unique_permnos,"permnos.txt",row.names = FALSE, col.names = FALSE, quote = FALSE)
+#using the permnos to construct the lookup table / linking table to later match the stock splits to the confounding events (CAP-IQ)
 
 # Expanding event window around declaration date to clear for all confounding events in 10 day period around split announcement:
 
@@ -126,9 +108,9 @@ split_df_4$declaration_date_5_pre <-as.numeric(format(split_df_4$declaration_dat
 
 # Confounding Events -------------------------------------------------------------------------------------
 
-# -> elimminating effects that could effect stock returns on announcement date
-#PERMNO's which conducted stocksplits (2000 - 2020) and where the declaration date is available (see unique_identifier)
-
+#elimminating effects that could effect stock returns on announcement date:
+#PERMNO's which conducted stocksplits (2010 - 2019) and where the declaration date is available (see unique_permnos)
+# -> loaded in to the linking table to receive the respective GVKEY
 #Linked with CRSP/Compustat Merged Database (under CRSP) - Linking Table (to  GVKEY)
 #@https://wrds-web.wharton.upenn.edu/wrds//ds/crsp/ccm_a/linktable/index.cfm#
 
@@ -141,26 +123,39 @@ linking_table_small_u<-unique(linking_table_small<-linking_table[,c("GVKEY","tic
 
 split_df_5<-merge(x = split_df_4, y = linking_table_small_u, by = c("permno","ticker"), all.x = TRUE)
 split_df_6 <- na.omit(split_df_5)
-#get the lookup table
+#matched the split data frame to the GVKEY identifiers
 
 #WRDS: Capital IQ - Key Developments, 01.01.2000 - 21.11.2020 
-# - used linked- cusips from linking tool to get all the company announcements related to the LPERMNO's which have seen a stock split
+# - used linked- GVKEYS from linking tool to get all the company announcements related to the LPERMNO's which have seen a stock split
+# - Capital IQ provides all the confounding events for the GVKEY in a data set
+
+# *Note: The "confounding_df" includes all confounding events from 01.01.2000 - 21.11.2020 for all companies to which
+# a link could be found with the methodology described above. So it contains more 
+# GVKEYS from splitting companies than the matched "splitd_df_6" which only focuses on 2010-2019. The reason being,
+# that analysis were conducted with the extended data set later than omited. However, the confounding data includes the subset of 2010-2019:
+
+#linking_table_extensive <- read.csv("linking_table.csv")
+#unique_permnos <-unique(linking_table_extensive$LPERMNO)
+#write.table(unique_permnos,"permno_confounding.txt",row.names = FALSE, col.names = FALSE, quote = FALSE)
+#unique_GVKEY <-unique(linking_table_extensive$GVKEY)
+#write.table(unique_GVKEY,"gvkey_confounding.txt",row.names = FALSE, col.names = FALSE, quote = FALSE)
+
 #@https://wrds-web.wharton.upenn.edu/wrds//ds/comp/ciq/keydev/index.cfm
 
 confounding_df <- read.csv("confounding_GVKEY.csv")
 colnames(confounding_df)[4]<-"declaration_date"
 colnames(confounding_df)[6]<-"GVKEY"
 
+
 # key_development_lookup <- read.csv2("key_development_lookup.csv")
 # colnames(key_development_lookup)[1] <- "keydeveventtypeid"
 # MANUAL CHECK: WHICH EVENTS SHOULD BE EXCLUDED
 
 confounding_df=confounding_df[!confounding_df$keydeveventtypeid %in% c(53,55,78,140,144),]
-#removing only superficial confounding events from the black list (announcement of certain dates, internal meeting dates etc.) that will bear
-#no information to the public
+#removing only superficial confounding events from the black list that will bear
+#no information to the public (expected announcement date estimations, certain company meeting dates etc.)
 
 merged_df_1<-left_join(x = split_df_6, y = confounding_df[,c(3,4,6)], by = c("declaration_date","GVKEY"))
-
 
 #Days after the announcement date 
 #+1
@@ -220,45 +215,23 @@ confounding_10days_small <- confounding_10days[,c(1:19)]
 
 # Further filter criteria --------------------------------------------------------------------------------
 
-
 confounding_10days_small$market_cap <- 
   as.numeric(as.character(confounding_10days_small$shares_oustanding_in_ks))*1000*as.numeric(as.character(confounding_10days_small$share_price))
 
 non_conf_df <- confounding_10days_small[as.numeric(as.character(confounding_10days_small$factor_to_adjust_price_FACPR))>0.25,]
-
-# non_conf_large<-confounding_10days_small[!confounding_10days_small$ticker=="INSY",]
-# 
-# confounding_10days_small[confounding_10days_small$ticker=="INSY",]
-#change back to 10days_small_df below
-#--------------------------------------------------------------------------------
 non_conf_large <- non_conf_df[non_conf_df$market_cap>1000000000,]
-#--------------------------------------------------------------------------------
-
-# non_conf_df <- non_conf_large[as.numeric(as.character(non_conf_large$factor_to_adjust_price_FACPR))>0.25,]
-#COMMENT
-# non_conf_df$year <- as.numeric(substr(non_conf_df$declaration_date, 1, 4))
-# non_conf_df_10_19 <- non_conf_df[(non_conf_df$year>=2010) & (non_conf_df$year<=2019),]
-#BEGINNING
-
-# final_df<-nrow(unique(non_conf_df))
-# final_df_2<-na.omit(final_df)
-
 final_df<-non_conf_large
+
+#Due to insufficient return data (only 52 returns)in the estimation window "FARMERS & MERCHANTS BANCORP INC" is removed
+final_df <- final_df[!final_df$ticker=="FMAO",]
 
 #Conversion from factors to numeric variables
 final_df$permco <- as.numeric(as.character(final_df$permco))
 final_df$trading_volume <- as.numeric(as.character(final_df$trading_volume))
 final_df$permno <- as.numeric(as.character(final_df$permno))
 
-# final_df_3 <- final_df_2[order(final_df_2$trading_volume, decreasing = TRUE),]
-# final_df_4 <- final_df_3[!duplicated(final_df_3$permco) | !duplicated(final_df_3$declaration_date),]
-#delete duplicated values with lowest trading volume
-
-#write.csv(final_df_4,"final_df_10_19_ff.csv",row.names=FALSE)
-
 
 # Return / Market data for split titles ---------------------------------------------------------------------------
-
 
 #Market return during 2000-2020 (NYSE,AMEX,NASDAQ - value weighted)
 #@https://wrds-web.wharton.upenn.edu/wrds//ds/crsp/indexes_a/mktindex/cap_d.cfm
@@ -267,7 +240,6 @@ final_df$permno <- as.numeric(as.character(final_df$permno))
 market_return_df <- read.csv("market_returns.csv")
 colnames(market_return_df)[1]<-"date"
 market_return_df$date <- as.Date(format(market_return_df$date , format = '%Y%m%d'), format = '%Y%m%d')
-
 
 # Daily stock returns: direct SQL querry from WRDS 
 # -> requires an account and storage of account name / PW on local file, see below:
@@ -310,7 +282,6 @@ all(final_df$declaration_date %in% dates_trades)
 
 #Event window
 final_df$start_date <- final_df$declaration_date-10
-final_df$announce_date_and_1 <-final_df$declaration_date+1
 final_df$end_date <-final_df$declaration_date+10
 
 #Start of estimation period
@@ -345,7 +316,6 @@ get_stock_return_until_announcement <- function(data.frame) {
       )
 }
 
-
 get_stock_return_after_announcement <- function(data.frame) {
   data_1<- tryCatch(
     {
@@ -374,7 +344,6 @@ get_stock_return_after_announcement <- function(data.frame) {
     
       )
 }
-
 
 return_df_before_announcement <- matrix(data=NA, nrow= 20, ncol= nrow(final_df))
 
@@ -425,7 +394,10 @@ get_stock_beta_from_estimation <- function(data.frame) {
       data_with_gap_120 <- tail(data_with_gap,120)
       rets<-merge(data_with_gap_120,market_return_df,by="date",all.x="true")
       regression<-lm(rets$ret ~ rets$vwretd)
-      return(regression$coefficients)
+      AR <- rets$ret - (regression$coefficients[1]+regression$coefficients[2]*rets$vwretd)
+      AR2 <- c(AR,rep(NA,120-length(AR)))
+      outList <- list("AR" = AR2,"COEF" =regression$coefficients)
+      return(outList)
     },
     error = function(e){
       message('Error in the process')
@@ -439,16 +411,37 @@ get_stock_beta_from_estimation <- function(data.frame) {
 
 
 alphas_betas_df <- matrix(data=NA, nrow= 2, ncol= nrow(final_df))
+abnormal_ret_estimw_df <- matrix(data=NA, nrow=120 , ncol= nrow(final_df))
 
 for (i in 1:nrow(final_df)){
   sub_df <- final_df[i,]
-  alphas_betas_df[,i] <- get_stock_beta_from_estimation(sub_df)
+  results <- get_stock_beta_from_estimation(sub_df)
+  alphas_betas_df[,i] <- results$COEF
+  abnormal_ret_estimw_df[,i] <- results$AR
 }
 
 alphas_betas_df <- as.data.frame(alphas_betas_df)
 
 rownames(alphas_betas_df)<-c("alpha","beta")
 colnames(alphas_betas_df)<-final_df$ticker
+
+abnormal_ret_estimw_df <- as.data.frame(abnormal_ret_estimw_df)
+colnames(abnormal_ret_estimw_df)<-final_df$ticker
+
+ar_variances_EW<-apply(abnormal_ret_estimw_df,2,var)
+
+ar_variances_EW_11<-11*ar_variances_EW
+ar_variances_EW_7<- 7*ar_variances_EW
+ar_variances_EW_3<- 3*ar_variances_EW
+
+var_acar_11 <-sum(ar_variances_EW_11)/nrow(final_df)^2
+var_acar_7 <-sum(ar_variances_EW_7)/nrow(final_df)^2
+var_acar_3 <-sum(ar_variances_EW_3)/nrow(final_df)^2
+
+sd_acar_11 <-var_acar_11^0.5
+sd_acar_7 <-var_acar_7^0.5
+sd_acar_3 <-var_acar_3^0.5
+SD_s <- c(sd_acar_11,sd_acar_7,sd_acar_3)
 
 market_model_df <- matrix(data=NA, nrow= 11, ncol= nrow(final_df))
 
@@ -460,75 +453,74 @@ for (i in 1:nrow(final_df)){
   market_model_df[,i]<-est_returns
 }
 
-car_df <- eventwindow_df - market_model_df
-car_df_3 <- car_df[3:9,]
-car_df_1 <- car_df_3[5:7,]
-#write.csv(car_df,"car_df.csv",row.names=TRUE)
+
+# Tests / Regressions and Analysis --------------------------------------------------------------------------------
+
+car_df_orig <- eventwindow_df - market_model_df
+car_df_3 <- car_df_orig[3:9,]
+car_df_1 <- car_df_orig[5:7,]
+list_1<-list(car_df_orig,car_df_3,car_df_1)
+
+CAR_main <- apply(car_df_orig,2,sum)
+
+days1<- -5:5
+days2<- -3:3
+days3<- -1:1
+list_2<-list(days1,days2,days3)
 
 
-# Regressions --------------------------------------------------------------------------------------------
-
-
-CAR_table_out<-as.data.frame(matrix(NA,ncol = 9, nrow = 11))
-
-colnames(CAR_table_out) <- c("Days","Average Abnormal Returns","Percentage of which positive","T-statistic","p-value",
-                             "Cummulative Average Abnormal Returns","Percentage of which positive","T-statistic","p-value")
-
-CAR_table_out[,1] <- -5:5
-CAR_table_out[,2] <- apply(car_df, 1, mean)
-CAR_table_out[,3] <- apply(car_df, 1, function(i) (sum(i>0)/ncol(car_df)))
-
-
-AAR <- apply(car_df, 1, mean)
-AR_AAR_df<- (car_df - AAR)^2
-daily_variance<- apply(AR_AAR_df,1,sum)*(1/(nrow(final_df)-1))
-daily_sd<-daily_variance^0.5
-
-daily_t_Values<-AAR/(daily_sd/sqrt(nrow(final_df)))
-p_values<-dnorm(daily_t_Values,0,sd=1)
-
-stats_<-rbind(AAR,daily_t_Values,p_values)
-
-
-
-CAR <- apply(car_df,2,sum)
-ACAR <- mean(CAR)
-var_CAR<-(1/nrow(final_df)^2)*sum((CAR-ACAR)^2)
-sd_CAR<-var_CAR^0.5
-cum_t_val<-mean(CAR)/sd_CAR
-cum_p_value<-dnorm(cum_t_val,0,sd=1)
-cum_stat <-rbind(ACAR,cum_t_val,cum_p_value)
-
-stats_
-cum_stat
-
-write.csv(car_df,"car_df_final3.csv")
-write.csv(non_conf_df,"stock_splits_pre_mcap.csv")
-# -------------------------------------------------------------------------------------
-for (i in 1:nrow(CAR_table_out)){
-  tests<-t.test(car_df[i,])
-  results_t_test[i] <- tests$statistic
-  results_p_values[i] <- tests$p.value
+for(a in 1:3){
+  
+  car_df<-as.data.frame(list_1[a])
+  sd_ew <- SD_s[a]
+  days_EW <- list_2[a]
+  
+  AAR <- apply(car_df, 1, mean)
+  AR_AAR_df<- (car_df - AAR)^2
+  daily_variance<- apply(AR_AAR_df,1,sum)*(1/(nrow(final_df)-1))
+  daily_sd<-daily_variance^0.5
+  
+  daily_t_Values<-AAR/(daily_sd/sqrt(nrow(final_df)))
+  p_values_daily <- rep(NA,nrow(car_df))
+  for(i in 1:nrow(car_df)){
+    p_values_daily[i] <-2*pt(-abs(daily_t_Values[i]),df=nrow(final_df)-1)
+  }
+  
+  CAR_table_out<-as.data.frame(matrix(NA,ncol = 5, nrow = nrow(car_df)))
+  colnames(CAR_table_out) <- c("Days","Average Abnormal Returns","Percentage of which positive","T-statistic","p-value")
+  
+  CAR_table_out[,1] <- days_EW
+  CAR_table_out[,2] <- AAR
+  CAR_table_out[,3] <- apply(car_df, 1, function(i) (sum(i>0)/ncol(car_df)))
+  CAR_table_out[,4] <- daily_t_Values
+  CAR_table_out[,5] <- p_values_daily
+  
+  CAR <- apply(car_df,2,sum)
+  ACAR <- mean(CAR)
+  var_CAR<-(1/nrow(final_df)^2)*sum((CAR-ACAR)^2)
+  sd_CAR<-var_CAR^0.5
+  cum_t_val<-ACAR/sd_CAR
+  cum_p_value<-2*pt(-abs(cum_t_val),df=nrow(final_df)-1)
+  
+  cum_t_val_with_acar_var<-ACAR/sd_ew
+  cum_p_val_with_acar_var<-2*pt(-abs(cum_t_val_with_acar_var),df=nrow(final_df)-1)
+  
+  cum_stats <-rbind(ACAR,sd_CAR,cum_t_val,cum_p_value,sd_ew,cum_t_val_with_acar_var,cum_p_val_with_acar_var)
+  rownames(cum_stats) <- c("Average cumulative abnormal return","SD","T-Statistic","p-value","SD Estimation window (AR's)","T-Statistic","p-value")
+  
+  EW_length<-c(11,7,3)
+  b<-EW_length[a]
+  
+  name1<-"Abnorma_return_table_with_EW"
+  name2<-"Cumulative_stats_with_EW"
+  name11<-paste(name1, b, 'csv', sep = '.')
+  name22<-paste(name2, b, 'csv', sep = '.')
+  
+  # write.csv(CAR_table_out,name11, row.names=FALSE)
+  # write.csv(cum_stats,name22)
 }
 
-# -------------------------------------------------------------------------------------
+final_df$two_for_one <- ifelse(final_df$factor_to_adjust_shares_FACSHR==1,1,0)
+final_df$over_two_for_one <- ifelse(final_df$factor_to_adjust_shares_FACSHR>1,1,0)
 
-CAR_table_out[,4] <- results_t_test
-CAR_table_out[,5] <- results_p_values
-
-cars_temporary_buffer<-as.data.frame(matrix(NA,ncol = nrow(final_df), nrow = 11))
-caars <- as.data.frame(matrix(NA,ncol = 1, nrow = 11))
-
-for (i in 1:nrow(CAR_table_out)){
-  small<-car_df[1:i,]
-  cars_temporary_buffer[i,]<-apply(small, 2, sum)
-  caars[i,]<-apply(cars_temporary_buffer[i,], 1, mean)
-}
-
-CAR_table_out[,6] <- caars
-CAR_table_out[,7] <- apply(cars_temporary_buffer, 1, function(i) (sum(i>0)/ncol(cars_temporary_buffer)))
-
-results_t_test_cum <- rep(NA,11)
-results_p_values_cum <- rep(NA,11)
-
-
+lm
