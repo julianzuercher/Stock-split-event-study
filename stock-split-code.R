@@ -219,7 +219,7 @@ confounding_10days_small$market_cap <-
   as.numeric(as.character(confounding_10days_small$shares_oustanding_in_ks))*1000*as.numeric(as.character(confounding_10days_small$share_price))
 
 non_conf_df <- confounding_10days_small[as.numeric(as.character(confounding_10days_small$factor_to_adjust_price_FACPR))>0.25,]
-non_conf_large <- non_conf_df[non_conf_df$market_cap>1000000000,]
+non_conf_large <- non_conf_df[non_conf_df$market_cap>0,]
 final_df<-non_conf_large
 
 #Due to insufficient return data (only 52 returns)in the estimation window "FARMERS & MERCHANTS BANCORP INC" is removed
@@ -461,12 +461,17 @@ car_df_3 <- car_df_orig[3:9,]
 car_df_1 <- car_df_orig[5:7,]
 list_1<-list(car_df_orig,car_df_3,car_df_1)
 
-CAR_main <- apply(car_df_orig,2,sum)
-
 days1<- -5:5
 days2<- -3:3
 days3<- -1:1
 list_2<-list(days1,days2,days3)
+
+CAR_11 <- apply(car_df_orig,2,sum)
+CAR_7 <-apply(car_df_3,2,sum)
+CAR_3 <-apply(car_df_1,2,sum)
+list_3<-list(CAR_11,CAR_7,CAR_3)
+
+EW_length<-c(11,7,3)
 
 
 for(a in 1:3){
@@ -508,7 +513,6 @@ for(a in 1:3){
   cum_stats <-rbind(ACAR,sd_CAR,cum_t_val,cum_p_value,sd_ew,cum_t_val_with_acar_var,cum_p_val_with_acar_var)
   rownames(cum_stats) <- c("Average cumulative abnormal return","SD","T-Statistic","p-value","SD Estimation window (AR's)","T-Statistic","p-value")
   
-  EW_length<-c(11,7,3)
   b<-EW_length[a]
   
   name1<-"Abnorma_return_table_with_EW"
@@ -520,7 +524,118 @@ for(a in 1:3){
   # write.csv(cum_stats,name22)
 }
 
-final_df$two_for_one <- ifelse(final_df$factor_to_adjust_shares_FACSHR==1,1,0)
-final_df$over_two_for_one <- ifelse(final_df$factor_to_adjust_shares_FACSHR>1,1,0)
+# Regression variables
+regression_df <- final_df
+#1.1 Split factor
+regression_df$factor_to_adjust_shares_FACSHR<-as.numeric(regression_df$factor_to_adjust_shares_FACSHR)+1
+regression_df$two_for_one <- ifelse(regression_df$factor_to_adjust_shares_FACSHR==2,1,0)
+regression_df$over_two_for_one <- ifelse(regression_df$factor_to_adjust_shares_FACSHR>2,1,0)
+#1.2 Split target price
+pre_split_stock_price<- rep(NA, nrow(regression_df))
+get_stock_price_pre_split <- function(data.frame) {
+  data_1<- tryCatch(
+    {
+      
+      a<- as.character(data.frame$permno[1])
+      b<- as.character(data.frame$est_start_date[1])
+      c<- as.character(data.frame$declaration_date[1])
+      d<-sprintf("select prc
+                 from crsp.dsf
+                 where permno = '%s'
+                 and date between '%s'
+                 and '%s'", a,b,c)
+      
+      res <- dbSendQuery(wrds, d)
+      data <- dbFetch(res, n=-1)
+      dbClearResult(res)
+      data_with_gap <- head(data,-5)
+      data_with_gap_1 <- tail(data_with_gap,1)
+      return(data_with_gap_1)
+    },
+    error = function(e){
+      message('Error in the process')
+      print(e)
+      dbClearResult(res)
+    }
+    
+    
+      )
+}
 
-lm
+for (i in 1:nrow(regression_df)){
+  sub_df <- regression_df[i,]
+  pre_split_stock_price[i] <- get_stock_price_pre_split(sub_df)
+}
+regression_df$pre_split_price <- as.numeric(pre_split_stock_price)
+regression_df$post_split_target_price  <- regression_df$pre_split_price / regression_df$factor_to_adjust_shares_FACSHR
+#1.4 Firm size
+regression_df$equity_value <- regression_df$pre_split_price*as.numeric(regression_df$shares_oustanding_in_ks)*1000/regression_df$factor_to_adjust_shares_FACSHR
+
+#1.4 Exchange
+regression_df$regression_NSYE <- ifelse(regression_df$exchange_code==1,1,0)
+regression_df$regression_AMEX <- ifelse(regression_df$exchange_code==2,1,0)
+
+
+
+for(b in 1:3){
+  c<-EW_length[b]
+  regressand<-unlist(list_3[b])
+
+
+  # -----------------------------------------------------------------------
+  # 1.1 Split factor
+  # -----------------------------------------------------------------------
+  
+  model_split_ratio <- lm(regressand ~ regression_df$two_for_one + regression_df$over_two_for_one)
+                            
+  summary(model_split_ratio)
+  name_r<-paste("C:/Users/juzu/Desktop/MBF/Research Seminar Corporate Finance/", "model_split_ratio_",c,".html",sep = '')
+  stargazer(model_split_ratio, type = "html", dep.var.labels=c("Cumulative Abnormal Return"),column.sep.width = "1pt",
+            out = name_r)
+  
+  # -----------------------------------------------------------------------
+  # 1.2 Split target price
+  # -----------------------------------------------------------------------
+  
+  model_post_split_range <- lm(regressand ~ regression_df$post_split_target_price)
+  name_r<-paste("C:/Users/juzu/Desktop/MBF/Research Seminar Corporate Finance/", "model_split_range_",c,".html",sep = '')
+  stargazer(model_post_split_range, type = "html", dep.var.labels=c("Cumulative Abnormal Return"),column.sep.width = "1pt",
+            out = name_r)
+  
+  # -----------------------------------------------------------------------
+  # 1.3 Split factor -> pre split share price
+  # -----------------------------------------------------------------------
+  
+  model_split_factor_EV <- lm(regression_df$factor_to_adjust_shares_FACSHR ~ regression_df$pre_split_price)
+  stargazer(model_split_factor_EV, type = "html", dep.var.labels=c("Split factor"),column.sep.width = "1pt",
+            out = "C:/Users/juzu/Desktop/MBF/Research Seminar Corporate Finance/model_split_factor_EV_nan.html")
+  
+  # -----------------------------------------------------------------------
+  # 1.4 Firm Size
+  # -----------------------------------------------------------------------
+  
+  model_size <- lm(regressand ~ log(regression_df$equity_value))
+  name_r<-paste("C:/Users/juzu/Desktop/MBF/Research Seminar Corporate Finance/", "model_size_",c,".html",sep = '')
+  stargazer(model_size, type = "html", dep.var.labels=c("Cumulative Abnormal Return"),column.sep.width = "1pt",
+            out = name_r)
+  
+  # -----------------------------------------------------------------------
+  # 1.5 Exchange
+  # -----------------------------------------------------------------------
+  
+  model_exchange <- lm(regressand ~ regression_df$regression_NSYE)
+  name_r<-paste("C:/Users/juzu/Desktop/MBF/Research Seminar Corporate Finance/", "model_exchange_",c,".html",sep = '')
+  stargazer(model_exchange, type = "html", dep.var.labels=c("Cumulative Abnormal Return"),column.sep.width = "1pt",
+            out = name_r)
+  
+  # -----------------------------------------------------------------------
+  # 1.6 Multivariate
+  # -----------------------------------------------------------------------
+  
+  model_multivariate <- lm(regressand ~ regression_df$post_split_target_price+regression_df$two_for_one + regression_df$over_two_for_one
+                             log(regression_df$equity_value) + factor(regression_df$exchange_code))
+  name_r<-paste("C:/Users/juzu/Desktop/MBF/Research Seminar Corporate Finance/", "model_multivariate_",c,".html",sep = '')
+  stargazer(model_multivariate, type = "html", dep.var.labels=c("Cumulative Abnormal Return"),column.sep.width = "1pt",
+            out = name_r)
+}
+
