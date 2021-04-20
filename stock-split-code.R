@@ -291,6 +291,10 @@ final_df$declaration_date <- as.Date(format(final_df$declaration_date, format = 
 # Eventstudy --------------------------------------------------------------
 # -------------------------------------------------------------------------
 
+#In the following section the eventstudy is conducted. First the effective returns of the splitting stocks in the event window are gathered.
+#Then the betas and alphas are calculated for the splitting stocks in the estimation window. With those parameters, and the market returns
+#abnormal returns can be calculated (both in the estimation window - for variance estimation purposes and the event window).
+#Finaly the the cumulative aggregated abnormal returns are used for regresions.
 
 # Date preparation ---------------------------------------------------------------------------------------
 
@@ -395,7 +399,7 @@ colnames(eventwindow_df)<-final_df$ticker
 rownames(eventwindow_df)<- c("t=-5","t=-4","t=-3","t=-2","t=-1","t=0","t=+1","t=+2","t=+3","t=+4","t=+5")
 
 
-# Beta estimation and abnormal return caluclation in event window-----------------------------------------
+# Beta estimation and abnormal return caluclation in estimation and event window--------------------------
 
 get_stock_beta_from_estimation <- function(data.frame) {
   data_1<- tryCatch(
