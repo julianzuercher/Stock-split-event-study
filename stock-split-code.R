@@ -601,10 +601,14 @@ for (i in 1:nrow(regression_df)){
 }
 regression_df$pre_split_price <- as.numeric(pre_split_stock_price)
 regression_df$post_split_target_price  <- regression_df$pre_split_price / regression_df$factor_to_adjust_shares_FACSHR
+#1.3 Pre-split share price
+prices_high_split_ratio <- regression_df[regression_df$factor_to_adjust_shares_FACSHR>2,"pre_split_price"]
+prices_low_split_ratio <- regression_df[regression_df$factor_to_adjust_shares_FACSHR<2,"pre_split_price"]
+var(prices_high_split_ratio)
+var(prices_low_split_ratio)
 #1.4 Firm size
 regression_df$equity_value <- regression_df$pre_split_price*as.numeric(regression_df$shares_oustanding_in_ks)*1000/regression_df$factor_to_adjust_shares_FACSHR
-
-#1.4 Exchange
+#1.5 Exchange
 regression_df$regression_NSYE <- ifelse(regression_df$exchange_code==1,1,0)
 regression_df$regression_AMEX <- ifelse(regression_df$exchange_code==2,1,0)
 
@@ -638,9 +642,7 @@ for(b in 1:3){
   # 1.3 Split factor -> pre split share price
   # -----------------------------------------------------------------------
   
-  model_split_factor_EV <- lm(regression_df$factor_to_adjust_shares_FACSHR ~ regression_df$pre_split_price)
-  stargazer(model_split_factor_EV, type = "html", dep.var.labels=c("Split factor"),column.sep.width = "1pt",
-            out = "C:/Users/juzu/Desktop/MBF/Research Seminar Corporate Finance/model_split_factor_EV_nan.html")
+  t_test <- t.test(prices_high_split_ratio,prices_low_split_ratio, alternative = "two.sided")
   
   # -----------------------------------------------------------------------
   # 1.4 Firm Size
@@ -664,10 +666,9 @@ for(b in 1:3){
   # 1.6 Multivariate
   # -----------------------------------------------------------------------
   
-  model_multivariate <- lm(regressand ~ regression_df$post_split_target_price+regression_df$two_for_one + regression_df$over_two_for_one
+  model_multivariate <- lm(regressand ~ regression_df$post_split_target_price+regression_df$two_for_one + regression_df$over_two_for_one+
                              log(regression_df$equity_value) + factor(regression_df$exchange_code))
   name_r<-paste("C:/Users/juzu/Desktop/MBF/Research Seminar Corporate Finance/", "model_multivariate_",c,".html",sep = '')
   stargazer(model_multivariate, type = "html", dep.var.labels=c("Cumulative Abnormal Return"),column.sep.width = "1pt",
             out = name_r)
 }
-
